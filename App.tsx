@@ -5,12 +5,15 @@
  * @format
  */
 
+import React from 'react'
 import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
+import { StatusBar, StyleSheet, useColorScheme, View, Text } from 'react-native';
 import {
   SafeAreaProvider,
   useSafeAreaInsets,
+  SafeAreaView,
 } from 'react-native-safe-area-context';
+import AppNavigator from './src/navigation/AppNavigator'
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
@@ -18,8 +21,11 @@ function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
+      <SafeAreaView style={styles.container} edges={[]}>
+        <AppNavigator />
+        {/* <HomeScreen /> */}
+      </SafeAreaView>
+    </SafeAreaProvider >
   );
 }
 
@@ -32,13 +38,20 @@ function AppContent() {
         templateFileName="App.tsx"
         safeAreaInsets={safeAreaInsets}
       />
+      <Text>This the app.</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1,                  // take full screen
+    // justifyContent: 'center', // vertical center
+    // alignItems: 'center',     // horizontal center
+  },
+  text: {
+    fontSize: 20,
+    marginTop: 10,
   },
 });
 
