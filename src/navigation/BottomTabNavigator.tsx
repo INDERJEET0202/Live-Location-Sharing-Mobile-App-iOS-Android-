@@ -1,5 +1,12 @@
-import React from 'react'
-import { View, StyleSheet, TouchableOpacity, Text, Dimensions } from 'react-native'
+import React, { useEffect, useRef } from 'react'
+import {
+    View,
+    StyleSheet,
+    TouchableOpacity,
+    Text,
+    Dimensions,
+    Animated,
+} from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import Ionicons from 'react-native-vector-icons/Ionicons'
 import { Colors } from '../theme/colors'
@@ -15,13 +22,128 @@ export type BottomTabParamList = {
 }
 
 const Tab = createBottomTabNavigator<BottomTabParamList>()
-
 const { width } = Dimensions.get('window')
 
 type CustomTabBarProps = {
     state: any
     descriptors: any
     navigation: any
+}
+
+// Animated tab item component
+function TabItem({route, index, isFocused, tab, onPress, colors, isDark,}: {route: any
+                                                                            index: number
+                                                                            isFocused: boolean
+                                                                            tab: { name: string; iconActive: string; iconInactive: string }
+                                                                            onPress: () => void
+                                                                            colors: any
+                                                                            isDark: boolean}) {
+    const scaleAnim = useRef(new Animated.Value(1)).current
+    const translateYAnim = useRef(new Animated.Value(0)).current
+    const opacityAnim = useRef(new Animated.Value(isFocused ? 1 : 0.6)).current
+    const indicatorWidth = useRef(new Animated.Value(isFocused ? 32 : 0)).current
+
+    useEffect(() => {
+        if (isFocused) {
+            // bounce up animation on active
+            Animated.parallel([
+                Animated.spring(scaleAnim, {
+                    toValue: 1.15,
+                    friction: 5,
+                    tension: 100,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(translateYAnim, {
+                    toValue: -3,
+                    friction: 5,
+                    tension: 100,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacityAnim, {
+                    toValue: 1,
+                    duration: 200,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(indicatorWidth, {
+                    toValue: 32,
+                    friction: 6,
+                    tension: 80,
+                    useNativeDriver: false,
+                }),
+            ]).start()
+        } else {
+            // back to normal on inactive
+            Animated.parallel([
+                Animated.spring(scaleAnim, {
+                    toValue: 1,
+                    friction: 5,
+                    tension: 100,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(translateYAnim, {
+                    toValue: 0,
+                    friction: 5,
+                    tension: 100,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(opacityAnim, {
+                    toValue: 0.6,
+                    duration: 200,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(indicatorWidth, {
+                    toValue: 0,
+                    friction: 6,
+                    tension: 80,
+                    useNativeDriver: false,
+                }),
+            ]).start()
+        }
+    }, [isFocused])
+
+    return (
+        <TouchableOpacity
+            onPress={onPress}
+            activeOpacity={0.7}
+            style={styles.tabItem}
+        >
+            {/* Animated top indicator */}
+            <Animated.View style={[
+                styles.activeIndicator,
+                {
+                    width: indicatorWidth,
+                    backgroundColor: Colors.primary,
+                }
+            ]} />
+
+            {/* Animated icon + label */}
+            <Animated.View style={[
+                styles.tabContent,
+                {
+                    transform: [
+                        { scale: scaleAnim },
+                        { translateY: translateYAnim },
+                    ],
+                    opacity: opacityAnim,
+                }
+            ]}>
+                <Ionicons
+                    name={isFocused ? tab.iconActive : tab.iconInactive}
+                    size={20}
+                    color={isFocused ? Colors.primary : colors.gray}
+                />
+                <Text style={[
+                    styles.tabLabel,
+                    {
+                        color: isFocused ? Colors.primary : colors.gray,
+                        fontWeight: isFocused ? '600' : '400',
+                    }
+                ]}>
+                    {tab.name}
+                </Text>
+            </Animated.View>
+        </TouchableOpacity>
+    )
 }
 
 function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
@@ -34,58 +156,86 @@ function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
     ]
 
     return (
-        <View style={[styles.wrapper, { paddingBottom: insets.bottom || 16 }]}>
-            <View style={[
-                styles.pill,
-                {
-                    backgroundColor: isDark ? '#1A1A2E' : '#ffffff',
-                    shadowColor: isDark ? Colors.primary : '#000',
-                }
-            ]}>
-                {state.routes.map((route: any, index: number) => {
-                    const isFocused = state.index === index
-                    const tab = tabs[index]
+        <View style={[
+            styles.container,
+            {
+                backgroundColor: isDark ? '#1A1A2E' : '#ffffff',
+                borderTopColor: isDark
+                    ? 'rgba(255,255,255,0.08)'
+                    : 'rgba(0,0,0,0.08)',
+                paddingBottom: insets.bottom - 20 || 8,
+            }
+        ]}>
+            {state.routes.map((route: any, index: number) => {
+                const isFocused = state.index === index
+                const tab = tabs[index]
 
-                    const onPress = () => {
-                        const event = navigation.emit({
-                            type: 'tabPress',
-                            target: route.key,
-                            canPreventDefault: true,
-                        })
-                        if (!isFocused && !event.defaultPrevented) {
-                            navigation.navigate(route.name)
-                        }
+                const onPress = () => {
+                    const event = navigation.emit({
+                        type: 'tabPress',
+                        target: route.key,
+                        canPreventDefault: true,
+                    })
+                    if (!isFocused && !event.defaultPrevented) {
+                        navigation.navigate(route.name)
                     }
+                }
 
-                    return (
-                        <TouchableOpacity
-                            key={route.key}
-                            onPress={onPress}
-                            activeOpacity={0.7}
-                            style={styles.tabItem}
-                        >
-                            {/* Active indicator pill */}
-                            {isFocused && (
-                                <View style={[styles.activePill, { backgroundColor: Colors.primary + '18' }]} />
-                            )}
-
-                            <Ionicons
-                                name={isFocused ? tab.iconActive : tab.iconInactive}
-                                size={22}
-                                color={isFocused ? Colors.primary : colors.gray}
-                            />
-
-                            <Text style={[
-                                styles.tabLabel,
-                                { color: isFocused ? Colors.primary : colors.gray }
-                            ]}>
-                                {tab.name}
-                            </Text>
-                        </TouchableOpacity>
-                    )
-                })}
-            </View>
+                return (
+                    <TabItem
+                        key={route.key}
+                        route={route}
+                        index={index}
+                        isFocused={isFocused}
+                        tab={tab}
+                        onPress={onPress}
+                        colors={colors}
+                        isDark={isDark}
+                    />
+                )
+            })}
         </View>
+    )
+}
+
+// Animated screen wrapper
+function AnimatedScreen({ children, focused }: { children: React.ReactNode, focused: boolean }) {
+    const fadeAnim = useRef(new Animated.Value(0)).current
+    const slideAnim = useRef(new Animated.Value(10)).current
+
+    useEffect(() => {
+        if (focused) {
+            Animated.parallel([
+                Animated.timing(fadeAnim, {
+                    toValue: 1,
+                    duration: 250,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(slideAnim, {
+                    toValue: 0,
+                    friction: 8,
+                    tension: 80,
+                    useNativeDriver: true,
+                }),
+            ]).start()
+        } else {
+            fadeAnim.setValue(0)
+            slideAnim.setValue(10)
+        }
+    }, [focused])
+
+    return (
+        <Animated.View
+            style={[
+                styles.screenWrapper,
+                {
+                    opacity: fadeAnim,
+                    transform: [{ translateY: slideAnim }],
+                }
+            ]}
+        >
+            {children}
+        </Animated.View>
     )
 }
 
@@ -93,57 +243,57 @@ export default function BottomTabNavigator() {
     return (
         <Tab.Navigator
             tabBar={(props) => <CustomTabBar {...props} />}
-            screenOptions={{ headerShown: false }}
-        >
-            <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
+            screenOptions={({ route }) => ({
+                headerShown: false,
+                animation: 'fade',
+            })}>
+            <Tab.Screen name="Home">
+                {({ navigation, route }) => (
+                    <AnimatedScreen focused={true}>
+                        <HomeScreen />
+                    </AnimatedScreen>
+                )}
+            </Tab.Screen>
+            <Tab.Screen name="Profile">
+                {({ navigation, route }) => (
+                    <AnimatedScreen focused={true}>
+                        <ProfileScreen />
+                    </AnimatedScreen>
+                )}
+            </Tab.Screen>
         </Tab.Navigator>
     )
 }
 
 const styles = StyleSheet.create({
-    wrapper: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        alignItems: 'center',
-        paddingHorizontal: 24,
+    container: {
+        flexDirection: 'row',
+        width: width,
+        borderTopWidth: 1,
         paddingTop: 8,
     },
-    pill: {
-        flexDirection: 'row',
-        borderRadius: 32,
-        paddingVertical: 10,
-        paddingHorizontal: 24,
-        width: width - 48,
-        justifyContent: 'space-evenly',
-        // gap: 100,
-        alignItems: 'center',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 24,
-        elevation: 12,
-    },
     tabItem: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 20,
         paddingVertical: 6,
-        gap: 3,
         position: 'relative',
     },
-    activePill: {
+    tabContent: {
+        alignItems: 'center',
+        gap: 4,
+    },
+    activeIndicator: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderRadius: 50,
+        top: -8,
+        height: 3,
+        borderRadius: 2,
     },
     tabLabel: {
         fontSize: 11,
-        fontWeight: '600',
-        letterSpacing: 0.3,
+        letterSpacing: 0.2,
+    },
+    screenWrapper: {
+        flex: 1,
     },
 })

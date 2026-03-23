@@ -1,32 +1,5 @@
-// import React from 'react'
-// import { View, Text, StyleSheet } from 'react-native'
-// import { useTheme } from '../theme/theme'
-
-// export default function HomeScreen() {
-//     const { colors } = useTheme()
-//     return (
-//         <View style={[styles.container, { backgroundColor: colors.background }]}>
-//             <Text style={[styles.text, { color: colors.text }]}>
-//                 Home Screen
-//             </Text>
-//         </View>
-//     )
-// }
-
-// const styles = StyleSheet.create({
-//     container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-//     text: { fontSize: 24, fontWeight: 'bold' },
-// })
-
-
 import React, { useEffect, useState, useRef } from 'react'
-import {
-    View,
-    StyleSheet,
-    ActivityIndicator,
-    Text,
-    Platform,
-} from 'react-native'
+import { View, StyleSheet, ActivityIndicator, Text, Platform, AppState, AppStateStatus } from 'react-native'
 import MapView, { UrlTile, PROVIDER_DEFAULT, Region } from 'react-native-maps'
 import {
     check,
@@ -49,30 +22,62 @@ export default function HomeScreen() {
         requestLocationPermission()
     }, [])
 
+    useEffect(() => {
+        const subscription = AppState.addEventListener(
+            'change',
+            async (nextState: AppStateStatus) => {
+                if (nextState === 'active') {
+                    const permission = Platform.OS === 'ios'
+                        ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
+                        : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION
+
+                    const status = await check(permission)
+
+                    if (status === RESULTS.GRANTED) {
+                        setPermissionStatus('granted')
+                        getCurrentLocation()
+                    } else {
+                        setPermissionStatus('denied')
+                    }
+                }
+            }
+        )
+        return () => subscription.remove()
+    }, [])
+
     const requestLocationPermission = async () => {
         try {
             const permission = Platform.OS === 'ios'
                 ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
                 : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION
-
-            // check current status first
+            console.log('permission: ', permission)
             const currentStatus = await check(permission)
-            console.log(currentStatus);
+            console.log('currentStatus: ', currentStatus)
+            // ✅ only GRANTED → skip popup
             if (currentStatus === RESULTS.GRANTED) {
                 setPermissionStatus('granted')
                 getCurrentLocation()
                 return
             }
 
-            // request if not granted
-            const result = await request(permission)
+            // ✅ only BLOCKED (Never) → can't ask again → show error
+            if (currentStatus === RESULTS.BLOCKED) {
+                setPermissionStatus('denied')
+                return
+            }
 
+            // ✅ everything else (DENIED, UNDETERMINED) → show popup
+            const result = await request(permission)
+            console.log('result: ', result)
             if (result === RESULTS.GRANTED) {
                 setPermissionStatus('granted')
                 getCurrentLocation()
+            } else if (result === RESULTS.BLOCKED) {
+                setPermissionStatus('denied')
             } else {
                 setPermissionStatus('denied')
             }
+
         } catch (err) {
             console.error('Permission error:', err)
             setPermissionStatus('denied')
@@ -83,41 +88,32 @@ export default function HomeScreen() {
         Geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords
-                const userRegion: Region = {
+                setRegion({
                     latitude,
                     longitude,
-                    latitudeDelta: 0.01,   // zoomed in — street level
+                    latitudeDelta: 0.01,
                     longitudeDelta: 0.01,
-                }
-                setRegion(userRegion)
+                })
+                setPermissionStatus('granted')
             },
             (error) => {
-                console.error('Location error:', error)
-                // fallback to India center
-                setRegion({
-                    latitude: 20.5937,
-                    longitude: 78.9629,
-                    latitudeDelta: 10,
-                    longitudeDelta: 10,
-                })
+                console.error('Location error:', error.code, error.message)
+                if (error.code === 1) {
+                    setPermissionStatus('denied')
+                } else {
+                    setRegion({
+                        latitude: 20.5937,
+                        longitude: 78.9629,
+                        latitudeDelta: 10,
+                        longitudeDelta: 10,
+                    })
+                }
             },
             {
                 enableHighAccuracy: true,
                 timeout: 10000,
                 maximumAge: 5000,
             }
-        )
-    }
-
-    // loading state while getting location
-    if (permissionStatus === 'checking' || !region) {
-        return (
-            <View style={[styles.centered, { backgroundColor: colors.background }]}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={[styles.loadingText, { color: colors.gray }]}>
-                    finding you on the map... 📍
-                </Text>
-            </View>
         )
     }
 
@@ -137,6 +133,18 @@ export default function HomeScreen() {
         )
     }
 
+    // loading state while getting location
+    if (permissionStatus === 'checking' || !region) {
+        return (
+            <View style={[styles.centered, { backgroundColor: colors.background }]}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={[styles.loadingText, { color: colors.gray }]}>
+                    finding you on the map... 📍
+                </Text>
+            </View>
+        )
+    }
+
     return (
         <View style={styles.container}>
             <MapView
@@ -151,9 +159,11 @@ export default function HomeScreen() {
             >
                 {/* OpenStreetMap tiles */}
                 <UrlTile
-                    urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    maximumZ={19}
-                    flipY={false}
+                    urlTemplate={
+                        isDark
+                            ? 'https://cartodb-basemaps-a.global.ssl.fastly.net/{z}/{x}/{y}.png'
+                            : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+                    }
                 />
             </MapView>
         </View>
