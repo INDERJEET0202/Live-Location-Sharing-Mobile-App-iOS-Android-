@@ -181,6 +181,8 @@ export default function LoginScreen() {
         setError(null)
         try {
             await sendOtp(email)
+            // const delay = Math.random() * 2000
+            // await new Promise(resolve => setTimeout(resolve, delay))
             navigation.navigate('Otp', { email })
         } catch (err: any) {
             setError(err.message || 'Something went wrong. Please try again.')
@@ -208,6 +210,7 @@ export default function LoginScreen() {
                         contentContainerStyle={styles.scrollContent}
                         keyboardShouldPersistTaps="handled"
                         showsVerticalScrollIndicator={false}
+                        scrollEnabled={false}
                     >
                         {/* Top section */}
                         <View style={styles.topSection}>
@@ -459,5 +462,6 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         alignItems: 'center',
         paddingBottom: 12,
+        minHeight: 280,
     },
 })
