@@ -1209,6 +1209,7 @@ const styles = StyleSheet.create({
     fieldTextInput: {
         fontSize: 15,
         paddingVertical: 14,
+        letterSpacing: 0.3,
     },
     editErrorRow: {
         flexDirection: 'row',
